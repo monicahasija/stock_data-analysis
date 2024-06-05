@@ -1,0 +1,39 @@
+WITH
+	transaction_prices AS
+		(SELECT
+			 date AS buy_date,
+			 low_price AS buy_price,
+			 MAX(high_price) OVER W AS sell_price,
+			 MAX(high_price) OVER W - low_price AS profit
+		 FROM
+			 stocks_data2
+		 WINDOW W AS (ORDER BY date ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)),
+	max_profit_transactions AS
+		(SELECT
+			 *
+		 FROM
+			 transaction_prices
+		 WHERE
+			 profit = (SELECT MAX(profit) FROM transaction_prices)),
+	max_profit_transactions_w_sell_date AS
+		(SELECT
+			 *,
+			 stocks_data2.date AS sell_date
+-- 			 stocks_data2.date - buy_date AS hold_days
+		 FROM
+			 max_profit_transactions
+				 LEFT JOIN stocks_data2
+				 ON high_price = sell_price
+				 AND stocks_data2.date >= max_profit_transactions.buy_date)
+SELECT
+	buy_date,
+	buy_price,
+	MIN(sell_date) AS sell_date,
+	MIN(sell_price) AS sell_price,
+	MIN(profit) AS profit,
+	min(sell_date)-buy_date as hold_days
+FROM
+	max_profit_transactions_w_sell_date
+GROUP BY buy_date, buy_price
+order by hold_days
+limit 1;
